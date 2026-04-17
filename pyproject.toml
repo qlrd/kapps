@@ -1,0 +1,167 @@
+# The MIT License (MIT)
+
+# Copyright (c) 2021-2026 Krux contributors
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+[project]
+name = "kapps"
+version = "26.03.1"
+description = "Krux apps for signing devices"
+authors = [{ name = "tadeubas", email = "tadeubas@gmail.com" }]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12.3"
+
+dependencies = [
+    "embit",
+    "ur",
+    "urtypes",
+]
+
+[tool.uv.sources]
+embit = { git = "https://github.com/diybitcoinhardware/embit.git", branch = "master" }
+ur = { git = "https://github.com/selfcustody/foundation-ur-py.git", branch = "master" }
+urtypes = { git = "https://github.com/selfcustody/urtypes.git", branch = "main" }
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1,<27",
+    "pylint>=4.0.5,<5",
+    "pytest>=9.0.2,<10",
+    "pytest-cov>=7.0.0,<8",
+    "pytest-mock>=3.15.1,<4",
+    "PyQRCode>=1.2.1,<2",
+    "pycryptodome>=3.23.0,<4",
+    "vulture>=2.15,<3",
+    "pre-commit>=4.5.1,<5",
+    "poethepoet>=0.42.1,<0.43",
+    "pymarkdown>=0.1.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.poe.tasks.vulture]
+args = [
+    { name = "whitelist", help = "make vulture_whitelist.py"},
+]
+shell = """
+set -euo pipefail
+
+vulture src --make-whitelist > vulture_whitelist.py
+"""
+
+[tool.poe.tasks.compile]
+args = [
+    { name = "name", help = "Basename of src/<name>.py", options = [
+        "-n",
+        "--name"
+    ], default = "k_qr" },
+]
+shell = """
+set -euo pipefail
+
+image="kapp-${name}"
+container="build-kapp-${name}"
+docker build --build-arg KAPP=${name} --target build-kapp -t ${image} .
+docker rm -f ${container} 2>/dev/null || true
+docker create --name ${container} ${image}
+docker cp ${container}:/out/${name}.mpy src/${name}.mpy
+docker rm -f ${container}
+"""
+
+[tool.poe.tasks.compile-all]
+shell = """
+set -euo pipefail
+for f in src/*.py; do
+    NAME=$(basename $f)
+    uv run poe compile --name ${NAME}
+done
+"""
+
+[tool.poe.tasks.get-pubkey]
+args = [
+    { name = "pubkey", help = "the openssl public key in PEM format", options =[
+        "-p",
+        "--pubkey"
+    ], default = "pubkey.pem" }
+]
+shell = """
+set -euo pipefail
+
+PUBKEY=$(openssl ec -noout -text -inform PEM -in ${pubkey} -pubin | tr -d '\n')
+PUBKEY=$(echo $PUBKEY | sed 's/Public-Key: (256 bit)pub://g' )
+PUBKEY=$(echo $PUBKEY | sed 's/ASN1 OID: secp256k1//g' )
+PUBKEY=$(echo $PUBKEY | sed 's/://g' )
+PUBKEY=$(echo $PUBKEY | sed 's/ //g' )
+echo $PUBKEY
+"""
+
+[tool.poe.tasks.kapp]
+args = [
+  { name = "name", help = "Basename of kapp/<name>.py", options = [
+    "-n",
+    "--name",
+  ], default = "nostr" },
+  { name = "prvkey", help = "Path to private key PEM", options = [
+    "-p",
+    "--prvkey",
+  ], default = "privkey.pem" },
+  { name = "pubkey", help = "Path to public key PEM", options = [
+    "-P",
+    "--pubkey",
+  ], default = "pubkey.pem" },
+]
+help = "Compile a .py to .mpy kapp and sign it to .mpy.sig"
+shell = """
+set -euo pipefail
+
+# prepare signature
+PUBKEY=$(uv run poe get-pubkey)
+
+# compile
+uv run poe compile --name ${name}
+
+# sign kapp
+while true; do
+    openssl dgst \
+        -sign ${prvkey} \
+        -keyform PEM \
+        -sha256 \
+        -out src/${name}.mpy.sig \
+        -binary src/${name}.mpy
+    if [ "$(wc -c < "src/${name}.mpy.sig")" -eq 70 ]; then
+        echo "Signature is exactly 70 bytes. Done!"
+        break
+    fi
+done
+
+# distribute
+mkdir -p dist
+mv src/${name}.mpy dist/${name}.mpy
+mv src/${name}.mpy.sig dist/${name}.mpy.sig
+"""
+
+[tool.poe.tasks.git-update]
+shell = "git submodule update --init --recursive"

@@ -1,0 +1,12 @@
+[submodule "firmware/MaixPy"]
+	path = firmware/MaixPy
+	url = https://github.com/selfcustody/MaixPy
+[submodule "vendor/embit"]
+	path = vendor/embit
+	url = https://github.com/diybitcoinhardware/embit
+[submodule "vendor/urtypes"]
+	path = vendor/urtypes
+	url = https://github.com/selfcustody/urtypes
+[submodule "vendor/foundation-ur-py"]
+	path = vendor/foundation-ur-py
+	url = https://github.com/selfcustody/foundation-ur-py
