@@ -1,0 +1,92 @@
+# Skip when needed:
+#
+# SKIP=conventional-pre-commit,isort,black,pylint,shellcheck,typos,pymarkdown git commit ...
+#
+# After changing this file: pre-commit install --install-hooks  (installs
+# pre-commit + commit-msg hooks).
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+repos:
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        name: isort (black profile)
+        args: [--settings-path=pyproject.toml]
+        files: ^src/
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        name: black
+        entry: black ./src
+
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v3.3.8
+    hooks:
+      - id: pylint
+        name: pylint (errors-only)
+        args: [--errors-only]
+        files: ^src/
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        files: ^scripts/.*\.sh$
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.45.0
+    hooks:
+      - id: typos
+        name: typos (spell check)
+        args: [--force-exclude]
+
+  - repo: https://github.com/jackdewinter/pymarkdown
+    rev: v0.9.28
+    hooks:
+      - id: pymarkdown
+        name: pymarkdown (markdown lint)
+
+  # - repo: local
+  #   hooks:
+  #     - id: vulture
+  #       name: vulture (dead code)
+  #       entry: uv run vulture src
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       require_serial: true
+  #     - id: i18n-validate
+  #       name: i18n validate
+  #       entry: uv run python i18n/i18n.py validate
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       require_serial: true
+  #     - id: test-clean
+  #       name: test-clean
+  #       entry: python -c 'import shutil, os; os.path.exists("htmlcov") and shutil.rmtree("htmlcov")'
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       require_serial: true
+  #     - id: unit-test
+  #       name: unit-test
+  #       entry: uv run pytest --cache-clear --cov src --cov-report html --show-capture all --capture tee-sys -r A ./tests
+  #       language: system
+  #       pass_filenames: false
+  #       always_run: true
+  #       require_serial: true
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        name: conventional-commit-1.0
+        stages: [commit-msg]
+        args: []
